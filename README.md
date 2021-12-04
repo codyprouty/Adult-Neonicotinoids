@@ -1,2 +1,2 @@
 # Adult-Neonicotinoids
-For manuscript review purposes.
+For review of manuscript: Prouty et al. 'Adult monarch butterflies show high tolerance to neoncotinoid insecticides'.
