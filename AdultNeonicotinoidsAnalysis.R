@@ -14,6 +14,8 @@ library(multcomp)
 library(survival)
 ##
 
+setwd("C:/Users/codyp/Desktop/WorkBackup/Research/AltizerLab/AdultLD502019/")
+
 #Import files
 Master <- read.csv("AdultNeonicMay2019.csv")
 Master2 <- read.csv("AdultFlightMaster.csv")
@@ -28,44 +30,85 @@ levels(Master2$Neonic) <- list(Ctrl="Ctrl", CL1 = "CL1", CL5 = "CL5")
 Distance <- subset(Master2, Flown == 1)
 Master2$WeCh <- (Master2$Day5Pre - Master2$Day1Pre) / Master2$Day1Pre
 Master2$SurvObj <- with(Master2, Surv(DeadAfter, Survived == 0))
+Master2$Conc <- as.factor(Master2$Conc)
 ###
 
 
 #Experiment 1 - Lab-reared monarchs and sub-lethal effects
 
 #Weight post cages
-modelPCW <- lmer(WeightEq ~ Conc * Neonic + Sex +(1|Lin) , data = Master)
+modelPCW <- lmer(WeightEq ~ Amount * Neonic + Sex +(1|Lin) , data = Master)
 anova(modelPCW, test = "F")
+PCW <- summary(modelPCW)
+write.csv(PCW$coefficients, "coefficients.csv")
+
 ###
 
 #Final - initial weight
-modelTPR <- lmer(Weight ~ Conc*Neonic+Sex + (1|Lin), data = Master)
+modelTPR <- lmer(Weight ~ Amount*Neonic+Sex + (1|Lin), data = Master)
 anova(modelTPR, test = "F")
+TPR <- summary(modelTPR)
+write.csv(TPR$coefficients, "coefficients1.csv")
 ###
 
 #Average nectar consumed
-modelAA <- lmer(AverageAmount ~ Conc*Neonic + Sex + (1|Lin) + WeightEclos, data = Master)
+modelAA <- lmer(AverageAmount ~ Amount*Neonic + Sex + (1|Lin) + WeightEclos, data = Master)
 anova(modelAA, test = "F")
+AA <- summary(modelAA)
+write.csv(AA$coefficients, "coefficients2.csv")
+
 ###
 
 #Egg hatching success
-EHS <- mixed(EggScore ~ Conc*Neonic + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
+EHS <- mixed(EggScore ~ Amount*Neonic + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
 EHS$anova_table
+EHS <- summary(EHS)
+write.csv(EHS$coefficients, "coefficients3.csv")
+
 ###
 
 #Number of days survived post experiment
-SUR <- mixed(TimePostRX ~ Conc*Neonic + Sex + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
+SUR <- mixed(TimePostRX ~ Amount*Neonic + Sex + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
 SUR$anova_table
+SUR <- summary(SUR)
+write.csv(SUR$coefficients, "coefficients4.csv")
+
 ###
 
 #Number of times males mated
-MM <- mixed(Matings ~ Conc*Neonic + WeightEclos + (1|Lin), family=poisson(link="log"), data = Matings1, method = "LRT")
+MM <- mixed(Matings ~ Amount * Neonic + WeightEclos + (1|Lin), family=poisson(link="log"), data = Matings1, method = "LRT")
 MM$anova_table
+MM <- summary(MM)
+write.csv(MM$coefficients, "coefficients5.csv")
+
+
+tgcWeight <- summarySE(Matings1, measurevar="Matings", groupvars=c("Amount"))
+
+plot(Matings ~ Amount, data = Matings1)
+
+lsm<-lsmeans (MM, list( ~ Amount))
+cld(lsm)
+
+emmeans(MM, ~1, type='response', at=list(Amount=0))
+emmeans(MM, ~1, type='response', at=list(Amount=500))
 ###
 
 #Number of eggs laid
-EGG <- mixed(Eggs ~ Conc*Neonic + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
+EGG <- mixed(Eggs ~ Amount*Neonic + WeightEclos + (1|Lin), family = poisson(link = "log"), data = Master, method="LRT")
 EGG$anova_table
+EGG <- summary(EGG)
+write.csv(EGG$coefficients, "coefficients6.csv")
+
+
+emmeans(EGG, ~1, type='response', at=list(c(Amount=0, Neonic="CL")))
+emmeans(EGG, ~1, type='response', at=list(Amount=500, Neonic="CL"))
+
+emmeans(EGG, ~1, type='response', at=list(c(Amount=0, Neonic="IM")))
+emmeans(EGG, ~1, type='response', at=list(Amount=500, Neonic="IM"))
+
+sim_bmond <- simulateResiduals(fittedModel = EGG, n = 250)
+hist(sim_bmond)
+plot(sim_bmond)
 ###
 
 #PCA for activity observations
@@ -73,18 +116,18 @@ Sex <- Master$Sex
 Group <- Master$Group
 Neonic <- Master$Neonic
 Lin <- Master$Lin
-Conc <- Master$Conc
+Amount <- Master$Amount
 Feeding <- Master$Feeding
 Flying <- Master$Flying
 Mating <- Master$Mating
-PCA <- data.frame(Sex, Group, Neonic, Conc, Lin, Feeding, Flying, Mating)
+PCA <- data.frame(Sex, Group, Neonic, Amount, Lin, Feeding, Flying, Mating)
 
 PCA <- na.omit(PCA)
 #sum(is.na(PCA))
 DR1 <- prcomp(PCA[-c(1,2,3,4,5)], center = TRUE, scale = TRUE)
 head(DR1$x)
 #there are my PCs
-PCAscores <- data.frame(Sex = PCA$Sex, Group = PCA$Group, Neonic = PCA$Neonic, Conc = PCA$Conc, Lin=PCA$Lin, PC1 = DR1$x[,1], PC2 = DR1$x[,2])
+PCAscores <- data.frame(Sex = PCA$Sex, Group = PCA$Group, Neonic = PCA$Neonic, Conc = PCA$Amount, Lin=PCA$Lin, PC1 = DR1$x[,1], PC2 = DR1$x[,2])
 
 PCA1POV <- DR1$sdev^2/sum(DR1$sdev^2)
 
@@ -117,6 +160,9 @@ for(G in unique(PCAscores$Group)){
 #significance of PC1, reported in table 2
 modelPCA <- lmer(PC1 ~ Conc*Neonic + Sex + (1|Lin), data = PCAscores)
 anova(modelPCA, test = "F")
+PCA <- summary(modelPCA)
+write.csv(PCA$coefficients, "coefficients7.csv")
+
 ###
 
 #Experiment 2 - wild monarchs and high-dose effects
@@ -124,31 +170,78 @@ anova(modelPCA, test = "F")
 #Average amount of nectar consumed
 AvgA <- lm(AVGAmount ~  Conc + Source + Sex + Day1Pre, data = Master2)
 anova(AvgA, test="F")
+Avga <- summary(AvgA)
+write.csv(Avga$coefficients, "coefficientss.csv")
+
+emmeans(AvgA, ~1, type='response', at=list(Conc="0"))
+emmeans(AvgA, ~1, type='response', at=list(Conc="1"))
+emmeans(AvgA, ~1, type='response', at=list(Conc="5"))
+
+
 ###
 
 #Proportional weight change during flight
 WeCh <- lm(WeCh ~ Conc + Source + Sex , data = Master2)
 anova(WeCh, test="F")
+Wech <- summary(WeCh)
+write.csv(Wech$coefficients, "coefficients1.csv")
+
+emmeans(WeCh, ~1, type='response', at=list(Conc="0"))
+emmeans(WeCh, ~1, type='response', at=list(Conc="1"))
+emmeans(WeCh, ~1, type='response', at=list(Conc="5"))
+
+
 ###
 
 #Distance flown
 Dist <- lm(DistanceKM ~ Conc + Source + Sex + FlightChange , data = Master2)
 anova(Dist, test = "F")
+DisT <- summary(Dist)
+write.csv(DisT$coefficients, "coefficients2.csv")
+
+emmeans(Dist, ~1, type='response', at=list(Conc="0"))
+emmeans(Dist, ~1, type='response', at=list(Conc="1"))
+emmeans(Dist, ~1, type='response', at=list(Conc="5"))
+
+
 ###
 
 #Average speed in flight
 Speed <- lm(KMHR ~  Conc + Source + Sex + FlightChange , data = Master2)
 anova(Speed, test = "F")
+SPeed <- summary(Speed)
+write.csv(SPeed$coefficients, "coefficients3.csv")
+
+emmeans(Speed, ~1, type='response', at=list(Conc="0"))
+emmeans(Speed, ~1, type='response', at=list(Conc="1"))
+emmeans(Speed, ~1, type='response', at=list(Conc="5"))
+
+
 ###
 
 #Drop test
 DT <- lm(DropTest ~  Conc + Source + Sex + Day1Pre, data = Master2)
 anova(DT, test = "F")
+Dt <- summary(DT)
+write.csv(Dt$coefficients, "coefficients4.csv")
+
+emmeans(DT, ~1, type='response', at=list(Conc="0"))
+emmeans(DT, ~1, type='response', at=list(Conc="1"))
+emmeans(DT, ~1, type='response', at=list(Conc="5"))
+
+
 ###
 
 #Survival
 Surv <- glm(Survived ~ Conc + Sex + Day1Pre + Source, family = binomial(link="logit"), data = Master2)
 anova(Surv, test="Chisq")
+SUrv <- summary(Surv)
+write.csv(SUrv$coefficients, "coefficients5.csv")
+
+emmeans(Surv, ~1, type='response', at=list(Conc="0"))
+emmeans(Surv, ~1, type='response', at=list(Conc="1"))
+emmeans(Surv, ~1, type='response', at=list(Conc="5"))
+
 ###
 
 #Graph of survival
